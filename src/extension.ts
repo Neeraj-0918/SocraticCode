@@ -3,10 +3,15 @@ import * as path from 'path';
 import { registerCommands } from './commands';
 import { SocraticSidebarProvider } from './webview/sidebarProvider';
 import { AnalysisService } from './analysis/analysisService';
+import { TutorService } from './tutor/tutorService';
+import { DemoProvider } from './providers/demoProvider';
 import { detectLanguage } from './utils/languageDetector';
+import { AnalysisResult } from './analysis/types';
 
 let analysisService: AnalysisService | null = null;
+let tutorService: TutorService | null = null;
 let sidebarProvider: SocraticSidebarProvider | null = null;
+let lastAnalysisResult: AnalysisResult | null = null;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   console.log('SocraticCode is activating... Think Better. Code Smarter.');
@@ -25,6 +30,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   }
 
+  // Initialize TutorService with default DemoProvider
+  const demoProvider = new DemoProvider();
+  tutorService = new TutorService(demoProvider);
+
   // Register Webview Sidebar Provider
   sidebarProvider = new SocraticSidebarProvider(context.extensionUri);
   context.subscriptions.push(
@@ -35,16 +44,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   // Helper to run analysis on current document
-  const runAnalysis = async () => {
+  const runAnalysis = async (): Promise<AnalysisResult | null> => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
       vscode.window.showWarningMessage('SocraticCode: Please open a Python or C file to analyze.');
-      return;
+      return null;
     }
 
     if (!analysisService) {
       vscode.window.showErrorMessage('SocraticCode: Analysis service not ready.');
-      return;
+      return null;
     }
 
     const doc = editor.document;
@@ -52,7 +61,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const filePath = doc.fileName;
     const languageId = doc.languageId;
 
-    vscode.window.withProgress(
+    return vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
         title: 'SocraticCode: Analyzing code structure (AST)...',
@@ -60,6 +69,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       },
       async () => {
         const result = await analysisService!.analyzeDocument(filePath, languageId, content);
+        lastAnalysisResult = result;
         const html = analysisService!.formatFindingsToHtml(result);
 
         sidebarProvider?.postMessage({
@@ -71,14 +81,98 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         sidebarProvider?.postMessage({
           type: 'updateStatus',
           language: result.language.toUpperCase(),
-          provider: 'Demo Mode',
+          provider: tutorService?.providerName || 'Demo Mode',
           isAi: false,
+        });
+
+        return result;
+      }
+    );
+  };
+
+  // Helper to handle asking a question
+  const handleAskQuestion = async (questionText?: string) => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showWarningMessage('SocraticCode: Please open a file first.');
+      return;
+    }
+
+    // Ensure we have active AST analysis findings
+    let analysis = lastAnalysisResult;
+    if (!analysis) {
+      analysis = await runAnalysis();
+    }
+    if (!analysis || !tutorService) return;
+
+    // Get selected code if any, or entire document
+    const selection = editor.selection;
+    const selectedText = selection && !selection.isEmpty
+      ? editor.document.getText(selection)
+      : editor.document.getText();
+
+    const question = questionText || 'Help me understand where I might be stuck or what this code is doing.';
+
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'SocraticCode: Generating progressive hint...',
+        cancellable: false,
+      },
+      async () => {
+        const response = await tutorService!.askQuestion(question, selectedText, analysis!);
+        const cardHtml = tutorService!.formatResponseToCardHtml(response);
+
+        sidebarProvider?.postMessage({
+          type: 'hintResult',
+          level: response.hintLevel,
+          cardHtml,
         });
       }
     );
   };
 
-  // Register all 8 commands with hooks
+  // Helper to handle requesting the next hint level
+  const handleRequestNextHint = async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !tutorService) {
+      vscode.window.showWarningMessage('SocraticCode: Please open a file first.');
+      return;
+    }
+
+    if (!tutorService.hasMoreHints) {
+      vscode.window.showInformationMessage('SocraticCode: All 3 progressive hint levels have been revealed!');
+      return;
+    }
+
+    let analysis = lastAnalysisResult;
+    if (!analysis) {
+      analysis = await runAnalysis();
+    }
+    if (!analysis) return;
+
+    const code = editor.document.getText();
+
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `SocraticCode: Generating Level ${tutorService.currentHintLevel + 1} hint...`,
+        cancellable: false,
+      },
+      async () => {
+        const response = await tutorService!.requestNextHint(code, analysis!);
+        const cardHtml = tutorService!.formatResponseToCardHtml(response);
+
+        sidebarProvider?.postMessage({
+          type: 'hintResult',
+          level: response.hintLevel,
+          cardHtml,
+        });
+      }
+    );
+  };
+
+  // Register all 8 commands
   registerCommands(context, {
     onOpenTutor: async () => {
       await vscode.commands.executeCommand('workbench.view.extension.socraticcode-container');
@@ -87,13 +181,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     onAnalyzeFile: async () => {
       await runAnalysis();
     },
+    onAskAboutSelection: async (question) => {
+      await handleAskQuestion(question);
+    },
+    onRequestNextHint: async () => {
+      await handleRequestNextHint();
+    },
     onClearSession: async () => {
+      tutorService?.resetSession();
+      lastAnalysisResult = null;
       sidebarProvider?.postMessage({ type: 'clearSession' });
       vscode.window.showInformationMessage('SocraticCode: Learning session reset.');
     },
   });
 
-  // Track active editor switch to update language badge
+  // Track active editor switch
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {

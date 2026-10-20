@@ -16,7 +16,7 @@ export type CommandId = typeof COMMAND_IDS[keyof typeof COMMAND_IDS];
 export interface CommandCallbacks {
   onOpenTutor?: () => void | Promise<void>;
   onAnalyzeFile?: () => void | Promise<void>;
-  onAskAboutSelection?: () => void | Promise<void>;
+  onAskAboutSelection?: (question?: string) => void | Promise<void>;
   onRequestNextHint?: () => void | Promise<void>;
   onOpenDashboard?: () => void | Promise<void>;
   onClearSession?: () => void | Promise<void>;
@@ -45,9 +45,9 @@ export function registerCommands(
       }
     }),
 
-    vscode.commands.registerCommand(COMMAND_IDS.askAboutSelection, async () => {
+    vscode.commands.registerCommand(COMMAND_IDS.askAboutSelection, async (question?: string) => {
       if (callbacks.onAskAboutSelection) {
-        await callbacks.onAskAboutSelection();
+        await callbacks.onAskAboutSelection(question);
       } else {
         vscode.window.showInformationMessage('SocraticCode: Asking about selection...');
       }

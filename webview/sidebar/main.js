@@ -76,7 +76,13 @@
           }
         }
         if (message.cardHtml) {
+          const emptyCard = hintsContainer.querySelector('.empty-card');
+          if (emptyCard) {
+            emptyCard.remove();
+          }
           hintsContainer.innerHTML += message.cardHtml;
+          // Scroll to the latest hint
+          hintsContainer.scrollTop = hintsContainer.scrollHeight;
         }
         break;
       }
