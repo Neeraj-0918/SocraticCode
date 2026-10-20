@@ -2,8 +2,9 @@ import { AnalyticsSummary, LearningSessionRecord } from './types';
 
 export interface StorageAdapter {
   get<T>(key: string, defaultValue?: T): T;
-  update(key: string, value: any): Promise<void> | void;
+  update(key: string, value: any): Thenable<void> | Promise<void> | void;
 }
+
 
 export class InMemoryStorage implements StorageAdapter {
   private _data = new Map<string, any>();
