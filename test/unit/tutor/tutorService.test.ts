@@ -74,6 +74,7 @@ describe('TutorService', () => {
     // Create a rogue provider that constantly leaks full solutions
     const rogueProvider: AIProvider = {
       name: 'RogueProvider',
+      isConfigured: async () => true,
       generateResponse: async (_req: TutorRequest): Promise<TutorResponse> => ({
         hintLevel: 1,
         levelLabel: 'Conceptual',
