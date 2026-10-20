@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" rx="28" fill="#1e1e2e"/>
+  <!-- Greek Pillar / Brain / Code Bracket motif -->
+  <path d="M34 38 L20 64 L34 90" stroke="#89b4fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M94 38 L108 64 L94 90" stroke="#89b4fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Pillar & Flame / Lightbulb center -->
+  <circle cx="64" cy="48" r="14" fill="#f9e2af"/>
+  <path d="M52 70 L76 70 L72 94 L56 94 Z" fill="#cdd6f4"/>
+  <rect x="48" y="94" width="32" height="6" rx="2" fill="#a6adc8"/>
+</svg>

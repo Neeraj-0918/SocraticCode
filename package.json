@@ -1,0 +1,88 @@
+{
+  "name": "socraticcode",
+  "displayName": "SocraticCode",
+  "description": "Think Better. Code Smarter. — AST-Informed AI Tutor for Progressive Socratic Programming Feedback",
+  "version": "0.1.0",
+  "publisher": "socraticcode",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Education"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:socraticcode-sidebar"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "socraticcode-container",
+          "title": "SocraticCode",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "socraticcode-container": [
+        {
+          "type": "webview",
+          "id": "socraticcode-sidebar",
+          "name": "SocraticCode Tutor"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "socraticcode.openTutor",
+        "title": "SocraticCode: Open Tutor"
+      },
+      {
+        "command": "socraticcode.analyzeCurrentFile",
+        "title": "SocraticCode: Analyze Current File"
+      },
+      {
+        "command": "socraticcode.askAboutSelection",
+        "title": "SocraticCode: Ask About Selected Code"
+      },
+      {
+        "command": "socraticcode.requestNextHint",
+        "title": "SocraticCode: Request Next Hint"
+      },
+      {
+        "command": "socraticcode.openDashboard",
+        "title": "SocraticCode: Open Learning Dashboard"
+      },
+      {
+        "command": "socraticcode.clearSession",
+        "title": "SocraticCode: Clear Learning Session"
+      },
+      {
+        "command": "socraticcode.configureProvider",
+        "title": "SocraticCode: Configure AI Provider"
+      },
+      {
+        "command": "socraticcode.switchDemoMode",
+        "title": "SocraticCode: Switch Demo Mode"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.1",
+    "typescript": "^5.3.3",
+    "vitest": "^1.3.1"
+  }
+}

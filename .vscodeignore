@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+docs/**
+.agents/**
+.socratic/**
+.superpowers/**
+**/*.map
+.gitignore
+.vscodeignore
+tsconfig.json
+esbuild.js
+vitest.config.ts
+**/*.ts
