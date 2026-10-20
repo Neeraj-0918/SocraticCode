@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TutorService } from '../../../src/tutor/tutorService';
 import { DemoProvider } from '../../../src/providers/demoProvider';
 import { AnalysisResult } from '../../../src/analysis/types';
+import { AIProvider } from '../../../src/providers/types';
+import { TutorRequest, TutorResponse } from '../../../src/tutor/types';
 
 describe('TutorService', () => {
   let tutorService: TutorService;
@@ -66,5 +68,29 @@ describe('TutorService', () => {
     expect(cardHtml).toContain('Level 1: Conceptual');
     expect(cardHtml).toContain('guiding-question');
     expect(cardHtml).toContain('What causes the condition to become False?');
+  });
+
+  it('should intercept leaking responses with guardrails and deploy safe fallback if retry fails', async () => {
+    // Create a rogue provider that constantly leaks full solutions
+    const rogueProvider: AIProvider = {
+      name: 'RogueProvider',
+      generateResponse: async (_req: TutorRequest): Promise<TutorResponse> => ({
+        hintLevel: 1,
+        levelLabel: 'Conceptual',
+        explanation: 'Here is your complete solution to fix everything:',
+        guidingQuestion: 'Does this help?',
+        codeSnippet: 'def countdown(n):\n    while n > 0:\n        n -= 1\n        print(n)',
+        rawText: 'leaked code',
+      }),
+    };
+
+    tutorService.setProvider(rogueProvider);
+    const res = await tutorService.askQuestion('Give me the answer', '', sampleAnalysis);
+
+    expect(tutorService.guardrailInterventionsCount).toBeGreaterThan(0);
+    expect(res.isFallback).toBe(true);
+    // Verified safe fallback has no code leak
+    expect(res.explanation).not.toContain('complete solution');
+    expect(res.guidingQuestion).toContain('What condition controls');
   });
 });

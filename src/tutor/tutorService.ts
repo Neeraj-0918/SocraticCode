@@ -2,6 +2,8 @@ import { AIProvider } from '../providers/types';
 import { HintEngine } from './hintEngine';
 import { ChatTurn, HintLevel, TutorRequest, TutorResponse } from './types';
 import { AnalysisResult } from '../analysis/types';
+import { ResponseValidator } from '../guardrails/validator';
+import { SafeFallbackGenerator } from '../guardrails/safeFallback';
 
 export class TutorService {
   private _provider: AIProvider;
@@ -9,6 +11,7 @@ export class TutorService {
   private _turns: ChatTurn[] = [];
   private _responses: TutorResponse[] = [];
   private _lastQuestion: string = '';
+  private _guardrailInterventionsCount: number = 0;
 
   constructor(provider: AIProvider) {
     this._provider = provider;
@@ -35,6 +38,10 @@ export class TutorService {
     return this._turns;
   }
 
+  public get guardrailInterventionsCount(): number {
+    return this._guardrailInterventionsCount;
+  }
+
   public async askQuestion(
     question: string,
     codeContext: string,
@@ -47,8 +54,10 @@ export class TutorService {
       timestamp: Date.now(),
     });
 
-    // Advance to Level 1 if no hint yet
-    const level: HintLevel = this._hintEngine.currentLevel === 0 ? this._hintEngine.requestNextLevel() : (this._hintEngine.currentLevel as HintLevel);
+    const level: HintLevel =
+      this._hintEngine.currentLevel === 0
+        ? this._hintEngine.requestNextLevel()
+        : (this._hintEngine.currentLevel as HintLevel);
 
     const request: TutorRequest = {
       language: analysis.language,
@@ -59,7 +68,7 @@ export class TutorService {
       sessionHistory: this._turns,
     };
 
-    const response = await this._provider.generateResponse(request);
+    const response = await this.generateWithGuardrails(request);
 
     this._turns.push({
       role: 'tutor',
@@ -87,7 +96,7 @@ export class TutorService {
       sessionHistory: this._turns,
     };
 
-    const response = await this._provider.generateResponse(request);
+    const response = await this.generateWithGuardrails(request);
 
     this._turns.push({
       role: 'tutor',
@@ -98,6 +107,42 @@ export class TutorService {
     this._responses.push(response);
 
     return response;
+  }
+
+  private async generateWithGuardrails(request: TutorRequest): Promise<TutorResponse> {
+    try {
+      const initialResponse = await this._provider.generateResponse(request);
+      const validation = ResponseValidator.validate(initialResponse);
+
+      if (validation.isValid) {
+        return initialResponse;
+      }
+
+      this._guardrailInterventionsCount++;
+
+      // Attempt 1: Controlled regeneration with explicit policy reminder
+      const retryRequest: TutorRequest = {
+        ...request,
+        question: `${request.question || ''}\n[SYSTEM NOTE: Previous response violated Socratic policy: ${validation.violations.join('; ')}. Re-generate adhering strictly to Level ${request.hintLevel} rules without full code.]`,
+      };
+
+      try {
+        const retryResponse = await this._provider.generateResponse(retryRequest);
+        const retryValidation = ResponseValidator.validate(retryResponse);
+
+        if (retryValidation.isValid) {
+          return retryResponse;
+        }
+
+        // If retry also failed, deploy safe deterministic fallback
+        return SafeFallbackGenerator.generate(request, retryValidation.violations);
+      } catch {
+        return SafeFallbackGenerator.generate(request, validation.violations);
+      }
+    } catch {
+      // If provider threw an error entirely, fallback safely
+      return SafeFallbackGenerator.generate(request, ['Provider request failed']);
+    }
   }
 
   public resetSession(): void {
@@ -119,9 +164,14 @@ export class TutorService {
       </div>`;
     }
 
+    const fallbackBadge = response.isFallback
+      ? `<span class="fallback-badge" title="Response calibrated to prevent solution leakage" style="margin-left: 8px; font-size: 10px; background: rgba(234, 179, 8, 0.2); color: #eab308; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(234, 179, 8, 0.3);">Shield Active</span>`
+      : '';
+
     return `<div class="hint-card ${levelClass}">
       <div class="hint-card-header">
         <span class="hint-badge">Level ${response.hintLevel}: ${response.levelLabel}</span>
+        ${fallbackBadge}
       </div>
       <div class="hint-card-body">
         <p class="explanation">${escapedExplanation}</p>
