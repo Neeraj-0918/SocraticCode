@@ -9,35 +9,41 @@ export interface FunctionInfo {
   name: string;
   parameters: string[];
   location: SourceLocation;
-  hasReturn: boolean;
+  hasReturn?: boolean;
 }
 
 export interface VariableInfo {
   name: string;
   location: SourceLocation;
   isParameter?: boolean;
+  inferredType?: string;
+  assignedValue?: string;
 }
 
 export interface LoopInfo {
-  type: 'for' | 'while';
+  type: 'for' | 'while' | 'do-while';
   conditionText?: string;
   variables: string[];
   location: SourceLocation;
 }
 
 export interface ConditionInfo {
-  type: 'if' | 'elif' | 'else';
+  type?: 'if' | 'elif' | 'else';
+  hasElse?: boolean;
   conditionText?: string;
   location: SourceLocation;
 }
 
 export interface CallInfo {
-  functionName: string;
-  arguments: string[];
+  functionName?: string;
+  callerName?: string;
+  arguments?: string[];
+  argumentCount?: number;
   location: SourceLocation;
 }
 
 export interface ReturnInfo {
+  hasValue?: boolean;
   valueText?: string;
   location: SourceLocation;
 }

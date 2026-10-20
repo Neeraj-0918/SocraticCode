@@ -9,6 +9,8 @@ import { GeminiProvider } from './providers/geminiProvider';
 import { KeyManager } from './providers/keyManager';
 import { detectLanguage } from './utils/languageDetector';
 import { AnalysisResult } from './analysis/types';
+import { AnalyticsStore } from './analytics/analyticsStore';
+import { DashboardPanel } from './webview/dashboardPanel';
 
 let analysisService: AnalysisService | null = null;
 let tutorService: TutorService | null = null;
@@ -16,6 +18,7 @@ let demoProvider: DemoProvider | null = null;
 let geminiProvider: GeminiProvider | null = null;
 let keyManager: KeyManager | null = null;
 let sidebarProvider: SocraticSidebarProvider | null = null;
+let analyticsStore: AnalyticsStore | null = null;
 let lastAnalysisResult: AnalysisResult | null = null;
 let isAiMode = false;
 
@@ -24,6 +27,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize KeyManager with VS Code SecretStorage
   keyManager = new KeyManager(context.secrets);
+
+  // Initialize Analytics Store with globalState
+  analyticsStore = new AnalyticsStore(context.globalState);
 
   // Initialize Providers
   demoProvider = new DemoProvider();
@@ -151,6 +157,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             level: response.hintLevel,
             cardHtml,
           });
+
+          await analyticsStore?.recordSession({
+            id: `sess-${Date.now()}`,
+            timestamp: Date.now(),
+            language: analysis!.language,
+            question,
+            maxHintLevel: response.hintLevel,
+            provider: tutorService!.providerName,
+            wasFallback: Boolean(response.isFallback),
+          });
         } catch (err: any) {
           vscode.window.showErrorMessage(`SocraticCode: ${err.message || String(err)}`);
           if (isAiMode) {
@@ -163,6 +179,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               type: 'hintResult',
               level: fallbackResponse.hintLevel,
               cardHtml: tutorService!.formatResponseToCardHtml(fallbackResponse),
+            });
+            await analyticsStore?.recordSession({
+              id: `sess-${Date.now()}`,
+              timestamp: Date.now(),
+              language: analysis!.language,
+              question,
+              maxHintLevel: fallbackResponse.hintLevel,
+              provider: 'Demo Mode (Fallback)',
+              wasFallback: true,
             });
           }
         }
@@ -207,6 +232,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             level: response.hintLevel,
             cardHtml,
           });
+
+          await analyticsStore?.recordSession({
+            id: `sess-${Date.now()}`,
+            timestamp: Date.now(),
+            language: analysis!.language,
+            question: `Requested Level ${response.hintLevel} Hint`,
+            maxHintLevel: response.hintLevel,
+            provider: tutorService!.providerName,
+            wasFallback: Boolean(response.isFallback),
+          });
         } catch (err: any) {
           vscode.window.showErrorMessage(`SocraticCode: ${err.message || String(err)}`);
         }
@@ -229,6 +264,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     onRequestNextHint: async () => {
       await handleRequestNextHint();
+    },
+    onOpenDashboard: async () => {
+      if (analyticsStore) {
+        DashboardPanel.createOrShow(context.extensionUri, analyticsStore);
+      }
     },
     onClearSession: async () => {
       tutorService?.resetSession();

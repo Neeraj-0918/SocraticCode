@@ -1,5 +1,6 @@
 import { AnalysisResult, LanguageAdapter } from './types';
 import { PythonAdapter } from './pythonAdapter';
+import { CAdapter } from './cAdapter';
 import { detectLanguage, isSupportedLanguage } from '../utils/languageDetector';
 
 export class AnalysisService {
@@ -10,9 +11,22 @@ export class AnalysisService {
     if (this._isInitialized) return;
 
     // Register Python adapter
-    const pythonAdapter = new PythonAdapter();
-    await pythonAdapter.initialize(wasmDir);
-    this._adapters.set('python', pythonAdapter);
+    try {
+      const pythonAdapter = new PythonAdapter();
+      await pythonAdapter.initialize(wasmDir);
+      this._adapters.set('python', pythonAdapter);
+    } catch (err) {
+      console.error('Python parser failed to initialize:', err);
+    }
+
+    // Register C adapter
+    try {
+      const cAdapter = new CAdapter();
+      await cAdapter.initialize(wasmDir);
+      this._adapters.set('c', cAdapter);
+    } catch (err) {
+      console.warn('C parser initialization skipped or failed:', err);
+    }
 
     this._isInitialized = true;
   }
@@ -41,7 +55,7 @@ export class AnalysisService {
         diagnostics: [
           {
             severity: 'error',
-            message: `Unsupported language '${languageId || detectedLang}'. Currently SocraticCode supports Python (and C).`,
+            message: `Unsupported language '${languageId || detectedLang}'. Currently SocraticCode supports Python and C.`,
             location: { startLine: 1, startColumn: 1, endLine: 1, endColumn: 1 },
           },
         ],
@@ -119,14 +133,14 @@ export class AnalysisService {
       items.push(`<div class="finding-group">
         <span class="finding-label">Conditionals (${result.conditions.length}):</span>
         <ul>
-          ${result.conditions.map(c => `<li><code>${c.type}</code> at Line ${c.location.startLine}${c.conditionText ? ` (<code>${escapeHtml(c.conditionText)}</code>)` : ''}</li>`).join('')}
+          ${result.conditions.map(c => `<li><code>${c.type || 'if'}</code> at Line ${c.location.startLine}${c.conditionText ? ` (<code>${escapeHtml(c.conditionText)}</code>)` : ''}</li>`).join('')}
         </ul>
       </div>`);
     }
 
     // Function calls
     if (result.functionCalls.length > 0) {
-      const uniqueCalls = Array.from(new Set(result.functionCalls.map(c => c.functionName)));
+      const uniqueCalls = Array.from(new Set(result.functionCalls.map(c => c.functionName || c.callerName || 'call')));
       items.push(`<div class="finding-group">
         <span class="finding-label">Function Calls:</span>
         <p>${uniqueCalls.map(c => `<code>${escapeHtml(c)}()</code>`).join(', ')}</p>
