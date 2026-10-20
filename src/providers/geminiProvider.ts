@@ -61,18 +61,35 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
-  public async testConnection(): Promise<boolean> {
+  public async verifyConnection(): Promise<{ success: boolean; error?: string; modelUsed?: string }> {
     const apiKey = await this._getApiKey();
-    if (!apiKey) return false;
+    if (!apiKey) return { success: false, error: 'API key is missing.' };
 
-    try {
-      const ai = new GoogleGenerativeAI(apiKey);
-      const model = ai.getGenerativeModel({ model: this._modelName });
-      const res = await model.generateContent('Say "OK" in one word.');
-      return res.response.text().trim().length > 0;
-    } catch {
-      return false;
+    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+    let lastError = '';
+
+    const ai = new GoogleGenerativeAI(apiKey);
+
+    for (const modelName of candidateModels) {
+      try {
+        const model = ai.getGenerativeModel({ model: modelName });
+        const res = await model.generateContent('Say "OK" in one word.');
+        if (res.response.text().trim().length > 0) {
+          (this as any)._modelName = modelName;
+          return { success: true, modelUsed: modelName };
+        }
+      } catch (err: any) {
+        lastError = err?.message || String(err);
+        console.warn(`Model ${modelName} check failed:`, lastError);
+      }
     }
+
+    return { success: false, error: lastError };
+  }
+
+  public async testConnection(): Promise<boolean> {
+    const res = await this.verifyConnection();
+    return res.success;
   }
 
   public static parseModelOutput(rawText: string, hintLevel: HintLevel): TutorResponse {

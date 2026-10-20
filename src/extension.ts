@@ -265,15 +265,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           cancellable: false,
         },
         async () => {
-          const valid = await geminiProvider!.testConnection();
-          if (valid) {
+          const verification = await geminiProvider!.verifyConnection();
+          if (verification.success) {
             isAiMode = true;
             tutorService!.setProvider(geminiProvider!);
             updateSidebarStatus();
-            vscode.window.showInformationMessage('SocraticCode: Gemini AI configured and verified successfully!');
+            vscode.window.showInformationMessage(
+              `SocraticCode: Gemini AI verified & active! (Model: ${verification.modelUsed})`
+            );
           } else {
-            vscode.window.showWarningMessage(
-              'SocraticCode: Could not verify Gemini API Key. Please check the key or your internet connection.'
+            vscode.window.showErrorMessage(
+              `SocraticCode: Gemini verification failed. ${verification.error || 'Please check key or internet connection.'}`
             );
           }
         }
