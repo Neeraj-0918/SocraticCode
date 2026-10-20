@@ -22,7 +22,6 @@
 
   btnAsk.addEventListener('click', () => {
     const text = questionInput.value.trim();
-    if (!text) return;
     vscode.postMessage({ type: 'askQuestion', text });
     questionInput.value = '';
   });
