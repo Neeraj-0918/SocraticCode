@@ -5,16 +5,36 @@ import { SocraticSidebarProvider } from './webview/sidebarProvider';
 import { AnalysisService } from './analysis/analysisService';
 import { TutorService } from './tutor/tutorService';
 import { DemoProvider } from './providers/demoProvider';
+import { GeminiProvider } from './providers/geminiProvider';
+import { KeyManager } from './providers/keyManager';
 import { detectLanguage } from './utils/languageDetector';
 import { AnalysisResult } from './analysis/types';
 
 let analysisService: AnalysisService | null = null;
 let tutorService: TutorService | null = null;
+let demoProvider: DemoProvider | null = null;
+let geminiProvider: GeminiProvider | null = null;
+let keyManager: KeyManager | null = null;
 let sidebarProvider: SocraticSidebarProvider | null = null;
 let lastAnalysisResult: AnalysisResult | null = null;
+let isAiMode = false;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   console.log('SocraticCode is activating... Think Better. Code Smarter.');
+
+  // Initialize KeyManager with VS Code SecretStorage
+  keyManager = new KeyManager(context.secrets);
+
+  // Initialize Providers
+  demoProvider = new DemoProvider();
+  geminiProvider = new GeminiProvider(async () => keyManager!.getApiKey());
+
+  // Check if API key exists
+  const hasKey = await keyManager.hasApiKey();
+  isAiMode = hasKey;
+
+  // Initialize TutorService with active provider
+  tutorService = new TutorService(isAiMode ? geminiProvider : demoProvider);
 
   // Initialize Analysis Service with parsers directory
   const parsersDir = path.join(context.extensionPath, 'dist', 'parsers');
@@ -30,10 +50,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   }
 
-  // Initialize TutorService with default DemoProvider
-  const demoProvider = new DemoProvider();
-  tutorService = new TutorService(demoProvider);
-
   // Register Webview Sidebar Provider
   sidebarProvider = new SocraticSidebarProvider(context.extensionUri);
   context.subscriptions.push(
@@ -42,6 +58,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       sidebarProvider
     )
   );
+
+  const updateSidebarStatus = () => {
+    const editor = vscode.window.activeTextEditor;
+    const lang = editor
+      ? detectLanguage(editor.document.fileName, editor.document.languageId).toUpperCase()
+      : 'No file open';
+
+    sidebarProvider?.postMessage({
+      type: 'updateStatus',
+      language: lang,
+      provider: isAiMode ? 'Gemini 2.0 (Active)' : 'Demo Mode',
+      isAi: isAiMode,
+    });
+  };
 
   // Helper to run analysis on current document
   const runAnalysis = async (): Promise<AnalysisResult | null> => {
@@ -78,13 +108,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           result,
         });
 
-        sidebarProvider?.postMessage({
-          type: 'updateStatus',
-          language: result.language.toUpperCase(),
-          provider: tutorService?.providerName || 'Demo Mode',
-          isAi: false,
-        });
-
+        updateSidebarStatus();
         return result;
       }
     );
@@ -98,14 +122,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       return;
     }
 
-    // Ensure we have active AST analysis findings
     let analysis = lastAnalysisResult;
     if (!analysis) {
       analysis = await runAnalysis();
     }
     if (!analysis || !tutorService) return;
 
-    // Get selected code if any, or entire document
     const selection = editor.selection;
     const selectedText = selection && !selection.isEmpty
       ? editor.document.getText(selection)
@@ -116,23 +138,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'SocraticCode: Generating progressive hint...',
+        title: `SocraticCode (${isAiMode ? 'Gemini AI' : 'Demo'}): Generating progressive hint...`,
         cancellable: false,
       },
       async () => {
-        const response = await tutorService!.askQuestion(question, selectedText, analysis!);
-        const cardHtml = tutorService!.formatResponseToCardHtml(response);
+        try {
+          const response = await tutorService!.askQuestion(question, selectedText, analysis!);
+          const cardHtml = tutorService!.formatResponseToCardHtml(response);
 
-        sidebarProvider?.postMessage({
-          type: 'hintResult',
-          level: response.hintLevel,
-          cardHtml,
-        });
+          sidebarProvider?.postMessage({
+            type: 'hintResult',
+            level: response.hintLevel,
+            cardHtml,
+          });
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`SocraticCode: ${err.message || String(err)}`);
+          if (isAiMode) {
+            vscode.window.showInformationMessage('SocraticCode: Falling back to Demo Mode for this request.');
+            tutorService!.setProvider(demoProvider!);
+            isAiMode = false;
+            updateSidebarStatus();
+            const fallbackResponse = await tutorService!.askQuestion(question, selectedText, analysis!);
+            sidebarProvider?.postMessage({
+              type: 'hintResult',
+              level: fallbackResponse.hintLevel,
+              cardHtml: tutorService!.formatResponseToCardHtml(fallbackResponse),
+            });
+          }
+        }
       }
     );
   };
 
-  // Helper to handle requesting the next hint level
+  // Helper to handle requesting next hint
   const handleRequestNextHint = async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor || !tutorService) {
@@ -156,18 +194,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `SocraticCode: Generating Level ${tutorService.currentHintLevel + 1} hint...`,
+        title: `SocraticCode (${isAiMode ? 'Gemini AI' : 'Demo'}): Generating Level ${tutorService.currentHintLevel + 1} hint...`,
         cancellable: false,
       },
       async () => {
-        const response = await tutorService!.requestNextHint(code, analysis!);
-        const cardHtml = tutorService!.formatResponseToCardHtml(response);
+        try {
+          const response = await tutorService!.requestNextHint(code, analysis!);
+          const cardHtml = tutorService!.formatResponseToCardHtml(response);
 
-        sidebarProvider?.postMessage({
-          type: 'hintResult',
-          level: response.hintLevel,
-          cardHtml,
-        });
+          sidebarProvider?.postMessage({
+            type: 'hintResult',
+            level: response.hintLevel,
+            cardHtml,
+          });
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`SocraticCode: ${err.message || String(err)}`);
+        }
       }
     );
   };
@@ -177,6 +219,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     onOpenTutor: async () => {
       await vscode.commands.executeCommand('workbench.view.extension.socraticcode-container');
       sidebarProvider?.show();
+      updateSidebarStatus();
     },
     onAnalyzeFile: async () => {
       await runAnalysis();
@@ -193,23 +236,78 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       sidebarProvider?.postMessage({ type: 'clearSession' });
       vscode.window.showInformationMessage('SocraticCode: Learning session reset.');
     },
+    onConfigureProvider: async () => {
+      const currentKey = await keyManager!.getApiKey();
+      const input = await vscode.window.showInputBox({
+        title: 'Configure Google Gemini API Key',
+        prompt: 'Enter your Gemini API Key from Google AI Studio (leave blank to remove key)',
+        password: true,
+        value: currentKey || '',
+        ignoreFocusOut: true,
+      });
+
+      if (input === undefined) return; // cancelled
+
+      if (input.trim() === '') {
+        await keyManager!.deleteApiKey();
+        isAiMode = false;
+        tutorService!.setProvider(demoProvider!);
+        updateSidebarStatus();
+        vscode.window.showInformationMessage('SocraticCode: Gemini API key removed. Switched to Demo Mode.');
+        return;
+      }
+
+      await keyManager!.setApiKey(input.trim());
+      vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: 'SocraticCode: Verifying Gemini API Key...',
+          cancellable: false,
+        },
+        async () => {
+          const valid = await geminiProvider!.testConnection();
+          if (valid) {
+            isAiMode = true;
+            tutorService!.setProvider(geminiProvider!);
+            updateSidebarStatus();
+            vscode.window.showInformationMessage('SocraticCode: Gemini AI configured and verified successfully!');
+          } else {
+            vscode.window.showWarningMessage(
+              'SocraticCode: Could not verify Gemini API Key. Please check the key or your internet connection.'
+            );
+          }
+        }
+      );
+    },
+    onSwitchDemoMode: async () => {
+      const hasKey = await keyManager!.hasApiKey();
+      if (!isAiMode) {
+        if (!hasKey) {
+          const action = await vscode.window.showWarningMessage(
+            'SocraticCode: No Gemini API Key configured. Would you like to configure one now?',
+            'Configure Key'
+          );
+          if (action === 'Configure Key') {
+            await vscode.commands.executeCommand('socraticcode.configureProvider');
+          }
+          return;
+        }
+        isAiMode = true;
+        tutorService!.setProvider(geminiProvider!);
+        vscode.window.showInformationMessage('SocraticCode: Switched to Gemini AI Mode.');
+      } else {
+        isAiMode = false;
+        tutorService!.setProvider(demoProvider!);
+        vscode.window.showInformationMessage('SocraticCode: Switched to offline Demo Mode.');
+      }
+      updateSidebarStatus();
+    },
   });
 
   // Track active editor switch
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor) {
-        const lang = detectLanguage(editor.document.fileName, editor.document.languageId);
-        sidebarProvider?.postMessage({
-          type: 'updateStatus',
-          language: lang !== 'unsupported' ? lang.toUpperCase() : 'Unsupported',
-        });
-      } else {
-        sidebarProvider?.postMessage({
-          type: 'updateStatus',
-          language: 'No file open',
-        });
-      }
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      updateSidebarStatus();
     })
   );
 
