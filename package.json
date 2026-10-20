@@ -10,6 +10,7 @@
   "categories": [
     "Education"
   ],
+  "icon": "resources/icon.png",
   "main": "./dist/extension.js",
   "activationEvents": [
     "onView:socraticcode-sidebar"
@@ -20,7 +21,7 @@
         {
           "id": "socraticcode-container",
           "title": "SocraticCode",
-          "icon": "resources/icon.svg"
+          "icon": "resources/icon.png"
         }
       ]
     },

@@ -56,6 +56,13 @@ body {
   font-size: 18px;
 }
 
+.branding .logo-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
 .branding .title {
   font-size: 15px;
   font-weight: 600;

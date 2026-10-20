@@ -20,5 +20,6 @@ BUDDY.md
 GEMINI.md
 skills-lock.json
 package-lock.json
+Coding.png
 **/*.ts
 !dist/**
