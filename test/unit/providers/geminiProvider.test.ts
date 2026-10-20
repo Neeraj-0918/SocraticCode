@@ -24,7 +24,7 @@ describe('GeminiProvider', () => {
   it('should report configured when apiKey is present', async () => {
     const provider = new GeminiProvider(() => Promise.resolve('test-key'));
     expect(await provider.isConfigured()).toBe(true);
-    expect(provider.name).toBe('Gemini 2.0 Flash');
+    expect(provider.name).toContain('Gemini');
   });
 
   it('should parse two-part structured response accurately', () => {

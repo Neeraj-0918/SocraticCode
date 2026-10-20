@@ -6,8 +6,8 @@ import { SOCRATIC_SYSTEM_PROMPT } from '../tutor/systemPrompt';
 import { PromptBuilder } from '../tutor/promptBuilder';
 
 export class GeminiProvider implements AIProvider {
-  public readonly name = 'Gemini 2.0 Flash';
-  private readonly _modelName = 'gemini-2.0-flash';
+  public name = 'Gemini AI';
+  private _modelName = 'gemini-3.8-flash';
 
   constructor(private readonly _getApiKey: () => Promise<string | undefined>) {}
 
@@ -65,7 +65,13 @@ export class GeminiProvider implements AIProvider {
     const apiKey = await this._getApiKey();
     if (!apiKey) return { success: false, error: 'API key is missing.' };
 
-    const candidateModels = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash'];
+    const candidateModels = [
+      'gemini-3.8-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+    ];
     let lastError = '';
 
     const ai = new GoogleGenerativeAI(apiKey);
@@ -75,7 +81,8 @@ export class GeminiProvider implements AIProvider {
         const model = ai.getGenerativeModel({ model: modelName });
         const res = await model.generateContent('Say "OK" in one word.');
         if (res.response.text().trim().length > 0) {
-          (this as any)._modelName = modelName;
+          this._modelName = modelName;
+          this.name = `Gemini (${modelName})`;
           return { success: true, modelUsed: modelName };
         }
       } catch (err: any) {
