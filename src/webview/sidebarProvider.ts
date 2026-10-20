@@ -19,6 +19,7 @@ export class SocraticSidebarProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [
         vscode.Uri.joinPath(this._extensionUri, 'dist'),
+        vscode.Uri.joinPath(this._extensionUri, 'resources'),
       ],
     };
 
@@ -70,7 +71,7 @@ export class SocraticSidebarProvider implements vscode.WebviewViewProvider {
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'sidebar', 'main.js')
     );
     const iconUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'resources', 'icon.png')
+      vscode.Uri.joinPath(this._extensionUri, 'dist', 'resources', 'icon.png')
     );
 
     // Nonce for CSP security
@@ -90,7 +91,7 @@ export class SocraticSidebarProvider implements vscode.WebviewViewProvider {
     <!-- Header -->
     <header class="header">
       <div class="branding">
-        <img class="logo-img" src="${iconUri}" alt="SocraticCode Icon" />
+        <img class="logo-img" src="${iconUri}" alt="" />
         <h2 class="title">SocraticCode</h2>
       </div>
       <div class="status-bar">

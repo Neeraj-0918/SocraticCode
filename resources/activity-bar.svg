@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="24" height="24">
+  <!-- SocraticCode Activity Bar Icon (Transparent Monochrome Mask) -->
+  <!-- Graduation Cap -->
+  <polygon points="50,14 84,27 50,39 16,27" fill="currentColor"/>
+  <path d="M30,34 L30,44 C30,49 70,49 70,44 L70,34" fill="currentColor"/>
+  <!-- Tassel -->
+  <path d="M74,30 L74,48 C74,51 76,51 76,48 L76,30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="75" cy="49" r="2.5" fill="currentColor"/>
+  
+  <!-- "S" Ribbon Body (Top curve) -->
+  <path d="M42,42 C30,42 22,50 22,60 C22,70 34,74 52,74 C58,74 62,72 62,69 C62,66 58,65 52,65 C38,65 31,63 31,58 C31,53 36,49 44,49 C54,49 60,46 60,43 C60,42 56,42 42,42 Z" fill="currentColor"/>
+  
+  <!-- "S" Ribbon Body (Bottom curve) -->
+  <path d="M46,75 C34,75 28,80 28,84 C28,91 38,95 54,95 C72,95 78,87 78,79 C78,69 66,66 50,66 C45,66 42,67 42,69 C42,71 45,72 50,72 C62,72 69,74 69,79 C69,82 64,86 54,86 C42,86 37,83 37,81 C37,79 41,77 46,75 Z" fill="currentColor"/>
+
+  <!-- Code brackets: < / > -->
+  <path d="M41,56 L36,60 L41,64" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M47,65 L51,55" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <path d="M57,56 L62,60 L57,64" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- AI Sparkle / Star on right -->
+  <path d="M78,51 Q82,55 86,55 Q82,55 78,59 Q82,55 78,51 Z M78,51 Q74,55 70,55 Q74,55 78,59 Q74,55 78,51 Z" fill="currentColor"/>
+</svg>

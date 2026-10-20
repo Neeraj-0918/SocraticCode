@@ -35,6 +35,14 @@ function copyStaticAssets() {
     copyDirSync(parsersSrc, parsersDest);
     console.log('[build] Copied parser WASM assets to dist/parsers');
   }
+
+  // Copy resources (icons, etc.) to dist/resources
+  const resourcesSrc = path.join(__dirname, 'resources');
+  const resourcesDest = path.join(__dirname, 'dist', 'resources');
+  if (fs.existsSync(resourcesSrc)) {
+    copyDirSync(resourcesSrc, resourcesDest);
+    console.log('[build] Copied resources assets to dist/resources');
+  }
 }
 
 async function build() {

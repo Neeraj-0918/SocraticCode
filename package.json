@@ -21,7 +21,7 @@
         {
           "id": "socraticcode-container",
           "title": "SocraticCode",
-          "icon": "resources/icon.png"
+          "icon": "resources/activity-bar.svg"
         }
       ]
     },
