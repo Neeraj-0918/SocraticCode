@@ -16,6 +16,13 @@ export class GeminiProvider implements AIProvider {
     return !!key && key.trim().length > 0;
   }
 
+  private readonly _fallbackModels = [
+    'gemini-1.5-flash',
+    'gemini-2.0-flash',
+    'gemini-2.5-flash',
+    'gemini-1.5-pro',
+  ];
+
   public async generateResponse(request: TutorRequest): Promise<TutorResponse> {
     const apiKey = await this._getApiKey();
     if (!apiKey) {
@@ -25,40 +32,76 @@ export class GeminiProvider implements AIProvider {
     }
 
     const ai = new GoogleGenerativeAI(apiKey);
-    const model = ai.getGenerativeModel({
-      model: this._modelName,
-      systemInstruction: SOCRATIC_SYSTEM_PROMPT,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 600,
-      },
-    });
-
     const userPrompt = PromptBuilder.buildPrompt(request);
 
-    try {
-      // 30s timeout safety
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini API request timed out after 30 seconds.')), 30000)
-      );
+    // Try current preferred model first, then fall back to stable alternatives
+    const modelsToTry = [
+      this._modelName,
+      ...this._fallbackModels.filter((m) => m !== this._modelName),
+    ];
 
-      const generatePromise = model.generateContent(userPrompt);
-      const result = await Promise.race([generatePromise, timeoutPromise]);
-      const rawText = result.response.text();
+    let lastError: any = null;
 
-      return GeminiProvider.parseModelOutput(rawText, request.hintLevel);
-    } catch (err: any) {
-      console.error('Gemini API call failed:', err);
+    for (const candidateModel of modelsToTry) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const model = ai.getGenerativeModel({
+            model: candidateModel,
+            systemInstruction: SOCRATIC_SYSTEM_PROMPT,
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 600,
+            },
+          });
 
-      let userMsg = err?.message || String(err);
-      if (userMsg.includes('429') || userMsg.includes('Quota')) {
-        userMsg = 'Gemini free-tier rate limit reached. Please wait a moment or switch to Demo Mode.';
-      } else if (userMsg.includes('API key not valid') || userMsg.includes('API_KEY_INVALID')) {
-        userMsg = 'Invalid Gemini API key. Please reconfigure your key in "SocraticCode: Configure AI Provider".';
+          // 30s timeout safety
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API request timed out after 30 seconds.')), 30000)
+          );
+
+          const generatePromise = model.generateContent(userPrompt);
+          const result = await Promise.race([generatePromise, timeoutPromise]);
+          const rawText = result.response.text();
+
+          // Seamlessly update active model if fallback succeeded
+          if (this._modelName !== candidateModel) {
+            console.log(`[GeminiProvider] Switched active model to ${candidateModel} after overload.`);
+            this._modelName = candidateModel;
+            this.name = `Gemini (${candidateModel})`;
+          }
+
+          return GeminiProvider.parseModelOutput(rawText, request.hintLevel);
+        } catch (err: any) {
+          lastError = err;
+          const msg = err?.message || String(err);
+          const is503 = msg.includes('503') || msg.includes('overloaded') || msg.includes('Service Unavailable');
+
+          if (is503 && attempt === 0) {
+            // Wait 1.2s before retrying once on the same model
+            console.warn(`[GeminiProvider] 503 Overload on ${candidateModel}, retrying in 1200ms...`);
+            await new Promise((r) => setTimeout(r, 1200));
+            continue;
+          }
+
+          if (msg.includes('API key not valid') || msg.includes('API_KEY_INVALID')) {
+            throw new Error('Invalid Gemini API key. Please reconfigure your key in "SocraticCode: Configure AI Provider".');
+          }
+
+          // If this model is overloaded or failed, break inner loop to try next fallback model
+          break;
+        }
       }
-
-      throw new Error(userMsg);
     }
+
+    console.error('All Gemini candidate models failed:', lastError);
+    let userMsg = lastError?.message || String(lastError);
+    if (userMsg.includes('503') || userMsg.includes('overloaded') || userMsg.includes('Service Unavailable')) {
+      userMsg = 'Google Gemini servers are currently overloaded (503 Service Unavailable). SocraticCode tried fallback models and will use Demo Mode in the meantime.';
+    } else if (userMsg.includes('429') || userMsg.includes('Quota')) {
+      userMsg = 'Gemini free-tier rate limit reached. Please wait a moment or switch to Demo Mode.';
+    }
+
+    throw new Error(userMsg);
   }
 
   public async verifyConnection(): Promise<{ success: boolean; error?: string; modelUsed?: string }> {
