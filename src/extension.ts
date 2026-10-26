@@ -139,7 +139,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ? editor.document.getText(selection)
       : editor.document.getText();
 
-    const question = questionText || 'Help me understand where I might be stuck or what this code is doing.';
+    const question = (typeof questionText === 'string' && questionText.trim().length > 0)
+      ? questionText.trim()
+      : 'Help me understand where I might be stuck or what this code is doing.';
 
     vscode.window.withProgress(
       {

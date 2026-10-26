@@ -163,67 +163,72 @@ export class DashboardPanel {
               const isAlt = s.mode === 'alternative_approach';
               const hintLevel = typeof s.maxHintLevel === 'number' ? s.maxHintLevel : 1;
               const modePill = isAlt
-                ? '<span class="badge badge-alt">✨ Alternative Approach</span>'
-                : `<span class="badge badge-l${hintLevel}">Level ${hintLevel} Hint</span>`;
+                ? '<span class="badge badge-alt">✨ Alternative</span>'
+                : `<span class="badge badge-l${hintLevel}">Level ${hintLevel}</span>`;
               const timeStr = s.timestamp ? new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
-              const qText = s.question || '';
-              const truncatedQ = qText.length > 48 ? qText.slice(0, 48) + '...' : qText;
+              const rawQ = s.question;
+              const qText = (typeof rawQ === 'string' && rawQ.trim().length > 0)
+                ? rawQ.trim()
+                : (typeof rawQ === 'object' && rawQ !== null ? 'Code inquiry' : 'General inquiry');
+              const truncatedQ = qText.length > 56 ? qText.slice(0, 56) + '...' : qText;
 
               return `
               <tr>
-                <td style="white-space: nowrap; color: var(--vscode-descriptionForeground); font-size: 11px;">${timeStr}</td>
-                <td style="text-transform: capitalize; font-weight: 600;">${escapeHtml(s.language || 'unknown')}</td>
+                <td style="white-space: nowrap; color: var(--muted); font-size: 11px;">${timeStr}</td>
+                <td style="text-transform: capitalize; font-weight: 500;">${escapeHtml(s.language || 'unknown')}</td>
                 <td><span class="badge badge-concept">${escapeHtml(conceptName)}</span></td>
                 <td>${modePill}</td>
-                <td title="${escapeHtml(qText)}">${escapeHtml(truncatedQ)}</td>
-                <td><span style="font-size: 11px; color: var(--vscode-descriptionForeground);">${escapeHtml(s.provider || 'unknown')}</span></td>
-                <td>${s.wasFallback ? '<span class="badge-guard">🛡️ Shield Active</span>' : '<span style="color:#22c55e; font-weight: 600; font-size: 11px;">✓ Clean</span>'}</td>
+                <td title="${escapeHtml(qText)}" style="color: var(--fg);">${escapeHtml(truncatedQ)}</td>
               </tr>`;
             }
           )
           .join('')
-      : '<tr><td colspan="7" style="text-align: center; color: var(--vscode-descriptionForeground); padding: 32px;">No learning sessions recorded yet. Ask questions or request hints in the SocraticCode sidebar to generate analytics!</td></tr>';
+      : '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 32px;">No learning sessions recorded yet. Ask questions or request hints in the SocraticCode sidebar to generate insights!</td></tr>';
 
-    // Weak Concept Heatmap Cards
+    // Encouraging Concept Practice Cards
     const weakConceptCards = (summary.weakConcepts && summary.weakConcepts.length > 0)
       ? summary.weakConcepts.map((item) => {
           let statusClass = 'status-solid';
-          let statusIcon = '✅';
-          let meterColor = '#22c55e';
+          let statusIcon = '✨';
+          let statusLabel = 'Confident';
+          let meterGradient = 'linear-gradient(90deg, #10b981, #34d399)';
           if (item.status === 'Needs Practice') {
-            statusClass = 'status-needs-practice';
-            statusIcon = '⚠️';
-            meterColor = '#ef4444';
+            statusClass = 'status-focus';
+            statusIcon = '🎯';
+            statusLabel = 'Focus Area';
+            meterGradient = 'linear-gradient(90deg, #6366f1, #818cf8)';
           } else if (item.status === 'Developing') {
-            statusClass = 'status-developing';
+            statusClass = 'status-progress';
             statusIcon = '🔄';
-            meterColor = '#f59e0b';
+            statusLabel = 'In Progress';
+            meterGradient = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
           }
+
+          const meterWidth = Math.min(Math.max(item.struggleRate, 14), 100);
 
           return `
           <div class="concept-card ${statusClass}">
             <div class="concept-card-top">
               <div class="concept-title-group">
                 <span class="concept-name">${escapeHtml(item.concept)}</span>
-                <span class="concept-tag ${statusClass}">${statusIcon} ${item.status}</span>
+                <span class="concept-tag ${statusClass}">${statusIcon} ${statusLabel}</span>
               </div>
-              <div class="concept-rate-number">${item.struggleRate}% struggle</div>
+              <div class="concept-rate-number">${item.highStruggleCount} deeper hints</div>
             </div>
             <div class="meter-track">
-              <div class="meter-fill" style="width: ${Math.max(item.struggleRate, 6)}%; background: ${meterColor};"></div>
+              <div class="meter-fill" style="width: ${meterWidth}%; background: ${meterGradient};"></div>
             </div>
             <div class="concept-meta">
-              <span><strong>${item.totalQueries}</strong> queries</span> · 
-              <span><strong>${item.highStruggleCount}</strong> required deeper hints (L2/L3)</span>
+              <span><strong>${item.totalQueries}</strong> questions explored</span>
             </div>
             <div class="concept-tip">
-              <span class="tip-label">💡 Recommended Practice:</span>
+              <span class="tip-label">💡 Recommended Practice</span>
               <p class="tip-text">${escapeHtml(item.recommendation)}</p>
             </div>
           </div>`;
         }).join('')
       : `<div class="empty-heatmap">
-          <p>🎯 No concept struggle data yet. As you ask questions and explore hints, SocraticCode will highlight your focus areas here!</p>
+          <p>🎯 No concept data yet. As you ask questions and explore hints, SocraticCode will highlight your study focus areas here!</p>
         </div>`;
 
     const topWeak = summary.weakConcepts?.find(c => c.status === 'Needs Practice');
@@ -231,7 +236,7 @@ export class DashboardPanel {
       ? `<div class="priority-banner">
           <div class="banner-icon">🎯</div>
           <div class="banner-content">
-            <div class="banner-title">High Priority Practice Recommendation: <strong>${escapeHtml(topWeak.concept)}</strong></div>
+            <div class="banner-title">Recommended Study Focus: <strong>${escapeHtml(topWeak.concept)}</strong></div>
             <div class="banner-desc">${escapeHtml(topWeak.recommendation)}</div>
           </div>
         </div>`
@@ -243,7 +248,7 @@ export class DashboardPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <title>SocraticCode Analytics Dashboard</title>
+  <title>SocraticCode Learning Dashboard</title>
   <style>
     :root {
       --bg: var(--vscode-editor-background, #181825);
@@ -251,7 +256,7 @@ export class DashboardPanel {
       --fg: var(--vscode-editor-foreground, #cdd6f4);
       --border: var(--vscode-widget-border, #313244);
       --muted: var(--vscode-descriptionForeground, #a6adc8);
-      --accent: var(--vscode-button-background, #89b4fa);
+      --accent: var(--vscode-button-background, #6366f1);
     }
     body {
       font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
@@ -271,7 +276,7 @@ export class DashboardPanel {
     }
     .title-area h1 {
       margin: 0 0 6px 0;
-      font-size: 22px;
+      font-size: 21px;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -290,12 +295,12 @@ export class DashboardPanel {
       background: var(--accent);
       color: var(--vscode-button-foreground, #fff);
       border: none;
-      padding: 8px 16px;
+      padding: 7px 15px;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
       font-size: 12px;
-      transition: opacity 0.15s ease;
+      transition: all 0.15s ease;
     }
     button:hover {
       opacity: 0.9;
@@ -305,20 +310,21 @@ export class DashboardPanel {
       color: var(--vscode-button-secondaryForeground, #cdd6f4);
       border: 1px solid var(--border);
     }
-    button.danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
+    button.clear-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
     }
-    button.danger:hover {
-      background: #dc2626;
-      color: #fff;
+    button.clear-btn:hover {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.25);
     }
 
     .priority-banner {
-      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.08));
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(56, 189, 248, 0.05));
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 10px;
       padding: 14px 18px;
       display: flex;
       align-items: center;
@@ -330,9 +336,9 @@ export class DashboardPanel {
       flex-shrink: 0;
     }
     .banner-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
-      color: #fca5a5;
+      color: #c7d2fe;
       margin-bottom: 2px;
     }
     .banner-desc {
@@ -349,11 +355,15 @@ export class DashboardPanel {
     .stat-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 6px;
+      transition: border-color 0.2s ease;
+    }
+    .stat-card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
     }
     .stat-label {
       font-size: 11px;
@@ -369,9 +379,9 @@ export class DashboardPanel {
     }
 
     .section-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
-      margin: 28px 0 14px 0;
+      margin: 28px 0 12px 0;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -379,10 +389,10 @@ export class DashboardPanel {
     .section-desc {
       font-size: 12px;
       color: var(--muted);
-      margin: -10px 0 14px 0;
+      margin: -8px 0 14px 0;
     }
 
-    /* Heatmap Grid */
+    /* Concept Cards Grid */
     .heatmap-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
@@ -392,24 +402,26 @@ export class DashboardPanel {
     .concept-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       position: relative;
+      transition: all 0.2s ease;
     }
-    .concept-card.status-needs-practice {
-      border-left: 4px solid #ef4444;
-      background: linear-gradient(180deg, rgba(239, 68, 68, 0.04) 0%, var(--card-bg) 100%);
+    .concept-card:hover {
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-1px);
     }
-    .concept-card.status-developing {
-      border-left: 4px solid #f59e0b;
-      background: linear-gradient(180deg, rgba(245, 158, 11, 0.04) 0%, var(--card-bg) 100%);
+    .concept-card.status-focus {
+      border-top: 3px solid #818cf8;
+    }
+    .concept-card.status-progress {
+      border-top: 3px solid #fbbf24;
     }
     .concept-card.status-solid {
-      border-left: 4px solid #22c55e;
-      background: linear-gradient(180deg, rgba(34, 197, 94, 0.04) 0%, var(--card-bg) 100%);
+      border-top: 3px solid #34d399;
     }
 
     .concept-card-top {
@@ -432,34 +444,35 @@ export class DashboardPanel {
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 4px;
       width: fit-content;
     }
-    .concept-tag.status-needs-practice {
-      background: rgba(239, 68, 68, 0.2);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
+    .concept-tag.status-focus {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
     }
-    .concept-tag.status-developing {
-      background: rgba(245, 158, 11, 0.2);
+    .concept-tag.status-progress {
+      background: rgba(245, 158, 11, 0.15);
       color: #fbbf24;
       border: 1px solid rgba(245, 158, 11, 0.3);
     }
     .concept-tag.status-solid {
-      background: rgba(34, 197, 94, 0.2);
-      color: #4ade80;
-      border: 1px solid rgba(34, 197, 94, 0.3);
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
     }
     .concept-rate-number {
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: 600;
       color: var(--muted);
+      white-space: nowrap;
     }
 
     .meter-track {
-      background: rgba(255, 255, 255, 0.08);
-      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      height: 5px;
       border-radius: 3px;
       overflow: hidden;
     }
@@ -473,18 +486,18 @@ export class DashboardPanel {
       color: var(--muted);
     }
     .concept-tip {
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.15);
       border-radius: 6px;
-      padding: 10px;
+      padding: 10px 12px;
       font-size: 12px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
     .tip-label {
       font-weight: 600;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -507,21 +520,21 @@ export class DashboardPanel {
     .bar-container {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 16px;
       margin-bottom: 28px;
     }
     .bar-wrapper {
-      height: 16px;
+      height: 14px;
       display: flex;
-      border-radius: 8px;
+      border-radius: 7px;
       overflow: hidden;
       margin: 12px 0;
       background: rgba(255, 255, 255, 0.06);
     }
-    .bar-l1 { background: #3b82f6; width: ${p1}%; }
-    .bar-l2 { background: #eab308; width: ${p2}%; }
-    .bar-l3 { background: #22c55e; width: ${p3}%; }
+    .bar-l1 { background: #38bdf8; width: ${p1}%; }
+    .bar-l2 { background: #fbbf24; width: ${p2}%; }
+    .bar-l3 { background: #34d399; width: ${p3}%; }
     .bar-legend {
       display: flex;
       gap: 20px;
@@ -530,8 +543,8 @@ export class DashboardPanel {
     }
     .legend-dot {
       display: inline-block;
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
       margin-right: 6px;
     }
@@ -541,7 +554,7 @@ export class DashboardPanel {
       border-collapse: collapse;
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
     }
     th, td {
@@ -551,38 +564,37 @@ export class DashboardPanel {
       font-size: 12px;
     }
     th {
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.02);
       color: var(--muted);
       font-weight: 600;
       text-transform: uppercase;
-      font-size: 11px;
+      font-size: 10px;
       letter-spacing: 0.5px;
     }
     .badge {
       display: inline-block;
-      padding: 2px 8px;
+      padding: 2px 7px;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 600;
       white-space: nowrap;
     }
-    .badge-l1 { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .badge-l2 { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
-    .badge-l3 { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
-    .badge-alt { background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2)); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .badge-concept { background: rgba(255, 255, 255, 0.07); color: var(--fg); border: 1px solid var(--border); }
-    .badge-guard { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .badge-l1 { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); }
+    .badge-l2 { background: rgba(251, 191, 36, 0.12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.25); }
+    .badge-l3 { background: rgba(52, 211, 153, 0.12); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.25); }
+    .badge-alt { background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.25); }
+    .badge-concept { background: rgba(255, 255, 255, 0.05); color: var(--fg); border: 1px solid var(--border); }
   </style>
 </head>
 <body>
   <div class="header">
     <div class="title-area">
-      <h1>⚡ SocraticCode Learning & Concept Diagnostics</h1>
-      <p class="subtitle">Cognitive scaffolding metrics, weak concept detection, and solution-leakage guardrail logs.</p>
+      <h1>🧠 SocraticCode Learning Dashboard</h1>
+      <p class="subtitle">Cognitive scaffolding distribution, concept mastery, and learning journey insights.</p>
     </div>
     <div class="actions">
       <button class="secondary" onclick="sendMessage('refresh')">↻ Refresh</button>
-      <button class="danger" onclick="sendMessage('clear')">Clear History</button>
+      <button class="clear-btn" onclick="sendMessage('clear')">Clear History</button>
     </div>
   </div>
 
@@ -595,25 +607,21 @@ export class DashboardPanel {
     </div>
     <div class="stat-card">
       <div class="stat-label">Level 1: Conceptual</div>
-      <div class="stat-value" style="color: #60a5fa;">${l1}</div>
+      <div class="stat-value" style="color: #38bdf8;">${l1}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Level 2: Reasoning</div>
-      <div class="stat-value" style="color: #facc15;">${l2}</div>
+      <div class="stat-value" style="color: #fbbf24;">${l2}</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Level 3: Structural</div>
-      <div class="stat-value" style="color: #4ade80;">${l3}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Guardrail Shield Interventions</div>
-      <div class="stat-value" style="color: #f87171;">${summary.guardrailInterventions}</div>
+      <div class="stat-value" style="color: #34d399;">${l3}</div>
     </div>
   </div>
 
-  <!-- Weak Concepts Heatmap & Practice Hub -->
-  <div class="section-title">🔥 Concept Diagnostics & Practice Heatmap</div>
-  <p class="section-desc">Identifies programming concepts where you required Level 2/3 hints or guardrail interventions, with targeted practice tips.</p>
+  <!-- Concept Diagnostics & Practice Hub -->
+  <div class="section-title">💡 Concept Focus & Practice Recommendations</div>
+  <p class="section-desc">Key programming topics explored, highlighting where deeper hints were requested to guide your practice.</p>
   <div class="heatmap-grid">
     ${weakConceptCards}
   </div>
@@ -627,14 +635,14 @@ export class DashboardPanel {
       <div class="bar-l3" title="Level 3: ${p3}%"></div>
     </div>
     <div class="bar-legend">
-      <div><span class="legend-dot" style="background: #3b82f6;"></span> Level 1 (Conceptual): ${p1}%</div>
-      <div><span class="legend-dot" style="background: #eab308;"></span> Level 2 (Logical Reasoning): ${p2}%</div>
-      <div><span class="legend-dot" style="background: #22c55e;"></span> Level 3 (Structural Guidance): ${p3}%</div>
+      <div><span class="legend-dot" style="background: #38bdf8;"></span> Level 1 (Conceptual): ${p1}%</div>
+      <div><span class="legend-dot" style="background: #fbbf24;"></span> Level 2 (Logical Reasoning): ${p2}%</div>
+      <div><span class="legend-dot" style="background: #34d399;"></span> Level 3 (Structural Guidance): ${p3}%</div>
     </div>
   </div>
 
-  <!-- Active Languages -->
-  <div class="section-title">💻 Practiced Programming Languages</div>
+  <!-- Practiced Languages -->
+  <div class="section-title">💻 Practiced Languages</div>
   <table style="margin-bottom: 28px;">
     <thead>
       <tr>
@@ -648,17 +656,15 @@ export class DashboardPanel {
   </table>
 
   <!-- Detailed Learning Log Table -->
-  <div class="section-title">📋 Learning Interaction Logs</div>
+  <div class="section-title">📋 Learning Interaction History</div>
   <table>
     <thead>
       <tr>
         <th>Time</th>
-        <th>Lang</th>
+        <th>Language</th>
         <th>Concept Area</th>
-        <th>Interaction Mode</th>
-        <th>User Question</th>
-        <th>Provider</th>
-        <th>Integrity Shield</th>
+        <th>Guidance Mode</th>
+        <th>Question / Query</th>
       </tr>
     </thead>
     <tbody>
