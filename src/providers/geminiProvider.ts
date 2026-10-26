@@ -7,7 +7,7 @@ import { PromptBuilder } from '../tutor/promptBuilder';
 
 export class GeminiProvider implements AIProvider {
   public name = 'Gemini AI';
-  private _modelName = 'gemini-3.8-flash';
+  private _modelName = 'gemini-2.0-flash';
 
   constructor(private readonly _getApiKey: () => Promise<string | undefined>) {}
 
@@ -66,11 +66,10 @@ export class GeminiProvider implements AIProvider {
     if (!apiKey) return { success: false, error: 'API key is missing.' };
 
     const candidateModels = [
-      'gemini-3.8-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
       'gemini-2.0-flash',
       'gemini-1.5-flash',
+      'gemini-1.5-pro',
     ];
     let lastError = '';
 
