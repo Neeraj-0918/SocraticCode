@@ -74,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     sidebarProvider?.postMessage({
       type: 'updateStatus',
       language: lang,
-      provider: isAiMode ? 'Gemini 2.0 (Active)' : 'Demo Mode',
+      provider: isAiMode ? `${geminiProvider?.name || 'Gemini AI'} (Active)` : 'Demo Mode',
       isAi: isAiMode,
     });
   };
