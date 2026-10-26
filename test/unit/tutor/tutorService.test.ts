@@ -94,4 +94,36 @@ describe('TutorService', () => {
     expect(res.explanation).not.toContain('complete solution');
     expect(res.guidingQuestion).toContain('What condition controls');
   });
+
+  it('should support exploreAlternative mode without generating replacement code', async () => {
+    const res = await tutorService.exploreAlternative('while count < 10:\n    pass', sampleAnalysis);
+    expect(res.mode).toBe('alternative_approach');
+    expect(res.conceptCategory).toBe('Algorithm Optimization');
+    expect(res.guidingQuestion).toBeDefined();
+    expect(res.nextStepOrSelfCheck).toBeDefined();
+
+    const cardHtml = tutorService.formatResponseToCardHtml(res);
+    expect(cardHtml).toContain('hint-alternative');
+    expect(cardHtml).toContain('Alternative / Optimized Approach');
+    expect(cardHtml).toContain('novice-try-this');
+  });
+
+  it('should render novice 3-part micro-breakdown and concept badges in card HTML', () => {
+    const cardHtml = tutorService.formatResponseToCardHtml({
+      hintLevel: 1,
+      levelLabel: 'Conceptual',
+      conceptCategory: 'Loop Termination & Iteration',
+      explanation: 'Think of a loop like a running track.',
+      guidingQuestion: 'How many laps are left?',
+      nextStepOrSelfCheck: 'Count your loop steps.',
+      rawText: '...',
+    });
+
+    expect(cardHtml).toContain('concept-badge');
+    expect(cardHtml).toContain('Loop Termination &amp; Iteration');
+    expect(cardHtml).toContain('novice-observation');
+    expect(cardHtml).toContain('novice-try-this');
+    expect(cardHtml).toContain('Count your loop steps.');
+  });
 });
+

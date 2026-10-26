@@ -105,4 +105,43 @@ describe('DemoProvider', () => {
     expect(res.explanation).toContain('Line 1');
     expect(res.guidingQuestion.length).toBeGreaterThan(10);
   });
+
+  it('should generate plain-text alternative approach guidance when mode is alternative_approach', async () => {
+    const analysis: AnalysisResult = {
+      language: 'python',
+      status: 'success',
+      functions: [],
+      variables: [],
+      loops: [{
+        type: 'for',
+        conditionText: 'item in list',
+        variables: [],
+        location: { startLine: 1, startColumn: 1, endLine: 3, endColumn: 10 },
+      }],
+      conditions: [{
+        conditionText: 'item > 0',
+        location: { startLine: 2, startColumn: 5, endLine: 3, endColumn: 10 },
+      }],
+      functionCalls: [],
+      returnStatements: [],
+      diagnostics: [],
+    };
+
+    const req: TutorRequest = {
+      language: 'python',
+      analysis,
+      hintLevel: 1,
+      mode: 'alternative_approach',
+      codeContext: 'for item in list:\n    if item > 0:\n        total += item',
+    };
+
+    const res = await provider.generateResponse(req);
+    expect(res.mode).toBe('alternative_approach');
+    expect(res.conceptCategory).toBe('Algorithm Optimization');
+    expect(res.codeSnippet).toBeUndefined(); // Must not generate full replacement code!
+    expect(res.explanation).toBeDefined();
+    expect(res.guidingQuestion).toBeDefined();
+    expect(res.nextStepOrSelfCheck).toBeDefined();
+  });
 });
+

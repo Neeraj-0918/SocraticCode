@@ -163,6 +163,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             timestamp: Date.now(),
             language: analysis!.language,
             question,
+            concept: response.conceptCategory || AnalyticsStore.inferConcept(question, analysis!.language),
             maxHintLevel: response.hintLevel,
             provider: tutorService!.providerName,
             wasFallback: Boolean(response.isFallback),
@@ -185,6 +186,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
               timestamp: Date.now(),
               language: analysis!.language,
               question,
+              concept: fallbackResponse.conceptCategory || AnalyticsStore.inferConcept(question, analysis!.language),
               maxHintLevel: fallbackResponse.hintLevel,
               provider: 'Demo Mode (Fallback)',
               wasFallback: true,
@@ -238,6 +240,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             timestamp: Date.now(),
             language: analysis!.language,
             question: `Requested Level ${response.hintLevel} Hint`,
+            concept: response.conceptCategory || 'Progressive Scaffold',
             maxHintLevel: response.hintLevel,
             provider: tutorService!.providerName,
             wasFallback: Boolean(response.isFallback),
@@ -249,7 +252,64 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
   };
 
-  // Register all 8 commands
+  // Helper to handle exploring alternative / optimized approach
+  const handleExploreAlternative = async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || !tutorService) {
+      vscode.window.showWarningMessage('SocraticCode: Please open a file first.');
+      return;
+    }
+
+    let analysis = lastAnalysisResult;
+    if (!analysis) {
+      analysis = await runAnalysis();
+    }
+    if (!analysis) return;
+
+    const selection = editor.selection;
+    const selectedText = selection && !selection.isEmpty
+      ? editor.document.getText(selection)
+      : editor.document.getText();
+
+    await vscode.commands.executeCommand('workbench.view.extension.socraticcode-container');
+    sidebarProvider?.show();
+
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `SocraticCode (${isAiMode ? 'Gemini AI' : 'Demo'}): Analyzing alternative approaches...`,
+        cancellable: false,
+      },
+      async () => {
+        try {
+          const response = await tutorService!.exploreAlternative(selectedText, analysis!);
+          const cardHtml = tutorService!.formatResponseToCardHtml(response);
+
+          sidebarProvider?.postMessage({
+            type: 'hintResult',
+            level: response.hintLevel,
+            cardHtml,
+          });
+
+          await analyticsStore?.recordSession({
+            id: `sess-${Date.now()}`,
+            timestamp: Date.now(),
+            language: analysis!.language,
+            question: 'Explore Alternative/Optimized Approach',
+            concept: 'Algorithm Optimization',
+            maxHintLevel: 1,
+            provider: tutorService!.providerName,
+            wasFallback: Boolean(response.isFallback),
+            mode: 'alternative_approach',
+          });
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`SocraticCode: ${err.message || String(err)}`);
+        }
+      }
+    );
+  };
+
+  // Register all commands
   registerCommands(context, {
     onOpenTutor: async () => {
       await vscode.commands.executeCommand('workbench.view.extension.socraticcode-container');
@@ -261,6 +321,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     onAskAboutSelection: async (question) => {
       await handleAskQuestion(question);
+    },
+    onExploreAlternative: async () => {
+      await handleExploreAlternative();
     },
     onRequestNextHint: async () => {
       await handleRequestNextHint();

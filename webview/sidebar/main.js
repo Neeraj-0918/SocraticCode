@@ -40,6 +40,13 @@
     vscode.postMessage({ type: 'openDashboard' });
   });
 
+  btnDashboard.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      vscode.postMessage({ type: 'openDashboard' });
+    }
+  });
+
   btnClear.addEventListener('click', () => {
     vscode.postMessage({ type: 'clearSession' });
   });

@@ -53,6 +53,10 @@
         "title": "SocraticCode: Ask About Selected Code"
       },
       {
+        "command": "socraticcode.exploreAlternative",
+        "title": "SocraticCode: Explore Alternative/Optimized Approach"
+      },
+      {
         "command": "socraticcode.requestNextHint",
         "title": "SocraticCode: Request Next Hint"
       },
@@ -72,7 +76,21 @@
         "command": "socraticcode.switchDemoMode",
         "title": "SocraticCode: Switch Demo Mode"
       }
-    ]
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "socraticcode.askAboutSelection",
+          "when": "editorHasSelection",
+          "group": "socraticcode@1"
+        },
+        {
+          "command": "socraticcode.exploreAlternative",
+          "when": "editorHasSelection",
+          "group": "socraticcode@2"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

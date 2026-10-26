@@ -4,6 +4,7 @@ export const COMMAND_IDS = {
   openTutor: 'socraticcode.openTutor',
   analyzeFile: 'socraticcode.analyzeCurrentFile',
   askAboutSelection: 'socraticcode.askAboutSelection',
+  exploreAlternative: 'socraticcode.exploreAlternative',
   requestNextHint: 'socraticcode.requestNextHint',
   openDashboard: 'socraticcode.openDashboard',
   clearSession: 'socraticcode.clearSession',
@@ -17,6 +18,7 @@ export interface CommandCallbacks {
   onOpenTutor?: () => void | Promise<void>;
   onAnalyzeFile?: () => void | Promise<void>;
   onAskAboutSelection?: (question?: string) => void | Promise<void>;
+  onExploreAlternative?: () => void | Promise<void>;
   onRequestNextHint?: () => void | Promise<void>;
   onOpenDashboard?: () => void | Promise<void>;
   onClearSession?: () => void | Promise<void>;
@@ -50,6 +52,14 @@ export function registerCommands(
         await callbacks.onAskAboutSelection(question);
       } else {
         vscode.window.showInformationMessage('SocraticCode: Asking about selection...');
+      }
+    }),
+
+    vscode.commands.registerCommand(COMMAND_IDS.exploreAlternative, async () => {
+      if (callbacks.onExploreAlternative) {
+        await callbacks.onExploreAlternative();
+      } else {
+        vscode.window.showInformationMessage('SocraticCode: Exploring alternative approach...');
       }
     }),
 

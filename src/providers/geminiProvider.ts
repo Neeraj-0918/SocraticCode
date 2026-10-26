@@ -101,11 +101,13 @@ export class GeminiProvider implements AIProvider {
   public static parseModelOutput(rawText: string, hintLevel: HintLevel): TutorResponse {
     const levelLabel = HintEngine.getLevelLabel(hintLevel);
 
-    const explanationMatch = rawText.match(/Explanation:\s*([\s\S]*?)(?=Guiding Question:|$)/i);
-    const questionMatch = rawText.match(/Guiding Question:\s*([\s\S]*?)$/i);
+    const explanationMatch = rawText.match(/(?:Explanation|Observation):\s*([\s\S]*?)(?=Guiding Question:|$)/i);
+    const questionMatch = rawText.match(/Guiding Question:\s*([\s\S]*?)(?=Try This:|$)/i);
+    const tryThisMatch = rawText.match(/Try This:\s*([\s\S]*?)$/i);
 
     let explanation = explanationMatch ? explanationMatch[1].trim() : '';
     let guidingQuestion = questionMatch ? questionMatch[1].trim() : '';
+    const nextStepOrSelfCheck = tryThisMatch ? tryThisMatch[1].trim() : undefined;
 
     // If model didn't follow the exact format, cleanly extract thoughts
     if (!explanation && !guidingQuestion) {
@@ -128,6 +130,7 @@ export class GeminiProvider implements AIProvider {
       levelLabel,
       explanation: explanation || 'Consider the logic and structure of your program.',
       guidingQuestion,
+      nextStepOrSelfCheck,
       rawText,
     };
   }

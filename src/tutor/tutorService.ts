@@ -145,6 +145,38 @@ export class TutorService {
     }
   }
 
+  public async exploreAlternative(
+    codeContext: string,
+    analysis: AnalysisResult
+  ): Promise<TutorResponse> {
+    const question = 'Explore alternative or more optimal approaches for this code.';
+    this._turns.push({
+      role: 'student',
+      text: question,
+      timestamp: Date.now(),
+    });
+
+    const request: TutorRequest = {
+      language: analysis.language,
+      question,
+      codeContext,
+      analysis,
+      hintLevel: 1,
+      mode: 'alternative_approach',
+      sessionHistory: this._turns,
+    };
+
+    const response = await this.generateWithGuardrails(request);
+    this._turns.push({
+      role: 'tutor',
+      text: `${response.explanation} ${response.guidingQuestion}`,
+      timestamp: Date.now(),
+      hintLevel: 1,
+    });
+    this._responses.push(response);
+    return response;
+  }
+
   public resetSession(): void {
     this._hintEngine.reset();
     this._turns = [];
@@ -153,7 +185,8 @@ export class TutorService {
   }
 
   public formatResponseToCardHtml(response: TutorResponse): string {
-    const levelClass = `hint-level-${response.hintLevel}`;
+    const isAlt = response.mode === 'alternative_approach';
+    const levelClass = isAlt ? 'hint-alternative' : `hint-level-${response.hintLevel}`;
     const escapedExplanation = escapeHtml(response.explanation);
     const escapedQuestion = escapeHtml(response.guidingQuestion);
 
@@ -165,20 +198,45 @@ export class TutorService {
     }
 
     const fallbackBadge = response.isFallback
-      ? `<span class="fallback-badge" title="Response calibrated to prevent solution leakage" style="margin-left: 8px; font-size: 10px; background: rgba(234, 179, 8, 0.2); color: #eab308; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(234, 179, 8, 0.3);">Shield Active</span>`
+      ? `<span class="fallback-badge" title="Response calibrated to prevent solution leakage">🛡️ Shield Active</span>`
       : '';
+
+    const conceptBadge = response.conceptCategory
+      ? `<span class="concept-badge">🏷️ ${escapeHtml(response.conceptCategory)}</span>`
+      : '';
+
+    const tryThisHtml = response.nextStepOrSelfCheck
+      ? `<div class="novice-try-this">
+          <span class="step-icon">🎯</span>
+          <div class="step-content">
+            <span class="step-label">Try This Next:</span>
+            <span class="step-desc">${escapeHtml(response.nextStepOrSelfCheck)}</span>
+          </div>
+        </div>`
+      : '';
+
+    const headerTitle = isAlt
+      ? '✨ Alternative / Optimized Approach'
+      : `Level ${response.hintLevel}: ${response.levelLabel}`;
 
     return `<div class="hint-card ${levelClass}">
       <div class="hint-card-header">
-        <span class="hint-badge">Level ${response.hintLevel}: ${response.levelLabel}</span>
-        ${fallbackBadge}
+        <span class="hint-badge">${headerTitle}</span>
+        <div class="header-badges">
+          ${conceptBadge}
+          ${fallbackBadge}
+        </div>
       </div>
       <div class="hint-card-body">
-        <p class="explanation">${escapedExplanation}</p>
+        <div class="novice-observation">
+          <span class="obs-icon">🔍</span>
+          <p class="explanation">${escapedExplanation}</p>
+        </div>
         <div class="guiding-question">
           <span class="question-icon">💡</span>
           <strong>${escapedQuestion}</strong>
         </div>
+        ${tryThisHtml}
         ${snippetHtml}
       </div>
     </div>`;

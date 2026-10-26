@@ -140,11 +140,27 @@ export class SocraticSidebarProvider implements vscode.WebviewViewProvider {
       </div>
     </section>
 
-    <!-- Session Footer Actions -->
-    <footer class="footer">
-      <button id="btn-dashboard" class="btn-link">📊 View Learning Dashboard</button>
-      <button id="btn-clear" class="btn-link btn-danger">Clear Session</button>
-    </footer>
+    <!-- Prominent Learning Hub & Session Actions -->
+    <section class="section hub-section">
+      <div class="hub-card" id="btn-dashboard" role="button" tabindex="0" title="Open Learning Diagnostics & Heatmap">
+        <div class="hub-card-left">
+          <div class="hub-icon-wrapper">
+            <span class="hub-icon">📊</span>
+          </div>
+          <div class="hub-info">
+            <span class="hub-title">Learning Dashboard</span>
+            <span class="hub-desc">Weak Concept Heatmap & Stats</span>
+          </div>
+        </div>
+        <span class="hub-arrow">→</span>
+      </div>
+
+      <div class="session-actions-row">
+        <button id="btn-clear" class="btn btn-danger-pill" title="Reset active hints and questions">
+          <span>🗑️</span> Reset Session
+        </button>
+      </div>
+    </section>
   </div>
 
   <script nonce="${nonce}" src="${scriptUri}"></script>

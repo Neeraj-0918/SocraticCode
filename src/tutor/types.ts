@@ -16,6 +16,7 @@ export interface TutorRequest {
   analysis: AnalysisResult;
   hintLevel: HintLevel;
   sessionHistory?: ChatTurn[];
+  mode?: 'hint' | 'alternative_approach';
 }
 
 export interface TutorResponse {
@@ -23,9 +24,13 @@ export interface TutorResponse {
   levelLabel: string;
   explanation: string;
   guidingQuestion: string;
+  analogyOrObservation?: string;
+  nextStepOrSelfCheck?: string;
+  conceptCategory?: string;
   codeSnippet?: string;
   rawText: string;
   isFallback?: boolean;
+  mode?: 'hint' | 'alternative_approach';
 }
 
 export interface TutorSession {
