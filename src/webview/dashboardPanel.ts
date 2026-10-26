@@ -27,6 +27,10 @@ export class DashboardPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        localResourceRoots: [
+          vscode.Uri.joinPath(extensionUri, 'dist'),
+          vscode.Uri.joinPath(extensionUri, 'resources'),
+        ],
       }
     );
 
@@ -42,6 +46,7 @@ export class DashboardPanel {
     this._extensionUri = extensionUri;
     this._analyticsStore = analyticsStore;
 
+    this._panel.webview.html = this.getLoadingHtml();
     this.refresh();
 
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -73,8 +78,30 @@ export class DashboardPanel {
   }
 
   public async refresh(): Promise<void> {
-    const summary = await this._analyticsStore.getSummary();
-    this._panel.webview.html = this.getHtmlForWebview(summary);
+    try {
+      const summary = await this._analyticsStore.getSummary();
+      this._panel.webview.html = this.getHtmlForWebview(summary);
+    } catch (err) {
+      console.error('SocraticCode Dashboard refresh failed:', err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      this._panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SocraticCode Dashboard Error</title>
+</head>
+<body style="font-family: var(--vscode-font-family, sans-serif); color: var(--vscode-editor-foreground, #ccc); background: var(--vscode-editor-background, #1e1e2e); padding: 40px; text-align: center;">
+  <h2>⚠️ Dashboard Error</h2>
+  <p style="color: #f87171;">Failed to load analytics: ${errorMsg}</p>
+  <p style="color: var(--vscode-descriptionForeground, #888);">Try clicking Refresh, or clear analytics data and retry.</p>
+  <button onclick="const vscode = acquireVsCodeApi(); vscode.postMessage({ type: 'refresh' });"
+    style="margin-top: 16px; padding: 8px 20px; background: var(--vscode-button-background, #89b4fa); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+    ↻ Retry
+  </button>
+</body>
+</html>`;
+    }
   }
 
   public dispose(): void {
@@ -86,7 +113,34 @@ export class DashboardPanel {
     }
   }
 
+  private getLoadingHtml(): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SocraticCode Learning Dashboard</title>
+</head>
+<body style="font-family: var(--vscode-font-family, -apple-system, sans-serif); color: var(--vscode-editor-foreground, #cdd6f4); background-color: var(--vscode-editor-background, #181825); display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+  <div style="text-align: center;">
+    <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 8px 0;">⚡ SocraticCode Learning Dashboard</h2>
+    <p style="color: var(--vscode-descriptionForeground, #a6adc8); font-size: 13px; margin: 0;">Loading analytics and concept diagnostics...</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  private getNonce(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let nonce = '';
+    for (let i = 0; i < 32; i++) {
+      nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return nonce;
+  }
+
   private getHtmlForWebview(summary: AnalyticsSummary): string {
+    const nonce = this.getNonce();
     const l1 = summary.hintsByLevel.l1;
     const l2 = summary.hintsByLevel.l2;
     const l3 = summary.hintsByLevel.l3;
@@ -100,24 +154,29 @@ export class DashboardPanel {
       .map(([lang, count]) => `<tr><td style="text-transform: capitalize; font-weight: 500;">${escapeHtml(lang)}</td><td><strong>${count}</strong> sessions</td></tr>`)
       .join('');
 
-    const recentRows = summary.recentSessions.length > 0
+    const recentRows = (summary.recentSessions && summary.recentSessions.length > 0)
       ? summary.recentSessions
+          .filter(Boolean)
           .map(
             (s) => {
               const conceptName = s.concept || 'General Problem Solving';
               const isAlt = s.mode === 'alternative_approach';
+              const hintLevel = typeof s.maxHintLevel === 'number' ? s.maxHintLevel : 1;
               const modePill = isAlt
                 ? '<span class="badge badge-alt">✨ Alternative Approach</span>'
-                : `<span class="badge badge-l${s.maxHintLevel}">Level ${s.maxHintLevel} Hint</span>`;
+                : `<span class="badge badge-l${hintLevel}">Level ${hintLevel} Hint</span>`;
+              const timeStr = s.timestamp ? new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+              const qText = s.question || '';
+              const truncatedQ = qText.length > 48 ? qText.slice(0, 48) + '...' : qText;
 
               return `
               <tr>
-                <td style="white-space: nowrap; color: var(--vscode-descriptionForeground); font-size: 11px;">${new Date(s.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                <td style="text-transform: capitalize; font-weight: 600;">${escapeHtml(s.language)}</td>
+                <td style="white-space: nowrap; color: var(--vscode-descriptionForeground); font-size: 11px;">${timeStr}</td>
+                <td style="text-transform: capitalize; font-weight: 600;">${escapeHtml(s.language || 'unknown')}</td>
                 <td><span class="badge badge-concept">${escapeHtml(conceptName)}</span></td>
                 <td>${modePill}</td>
-                <td title="${escapeHtml(s.question)}">${escapeHtml(s.question.slice(0, 48))}${s.question.length > 48 ? '...' : ''}</td>
-                <td><span style="font-size: 11px; color: var(--vscode-descriptionForeground);">${escapeHtml(s.provider)}</span></td>
+                <td title="${escapeHtml(qText)}">${escapeHtml(truncatedQ)}</td>
+                <td><span style="font-size: 11px; color: var(--vscode-descriptionForeground);">${escapeHtml(s.provider || 'unknown')}</span></td>
                 <td>${s.wasFallback ? '<span class="badge-guard">🛡️ Shield Active</span>' : '<span style="color:#22c55e; font-weight: 600; font-size: 11px;">✓ Clean</span>'}</td>
               </tr>`;
             }
@@ -183,6 +242,7 @@ export class DashboardPanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this._panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>SocraticCode Analytics Dashboard</title>
   <style>
     :root {
@@ -606,7 +666,7 @@ export class DashboardPanel {
     </tbody>
   </table>
 
-  <script>
+  <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     function sendMessage(type) {
       vscode.postMessage({ type });
@@ -617,8 +677,11 @@ export class DashboardPanel {
   }
 }
 
-function escapeHtml(text: string): string {
-  return text
+function escapeHtml(text?: string | null): string {
+  if (text === undefined || text === null) {
+    return '';
+  }
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

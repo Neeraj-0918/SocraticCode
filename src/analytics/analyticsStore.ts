@@ -42,7 +42,8 @@ export class AnalyticsStore {
   }
 
   public async getSummary(): Promise<AnalyticsSummary> {
-    const sessions = this._storage.get<LearningSessionRecord[]>(AnalyticsStore.STORAGE_KEY, []);
+    const rawSessions = this._storage.get<LearningSessionRecord[]>(AnalyticsStore.STORAGE_KEY, []);
+    const sessions = Array.isArray(rawSessions) ? rawSessions : [];
 
     const hintsByLevel = { l1: 0, l2: 0, l3: 0 };
     const languages: Record<string, number> = {};
@@ -50,11 +51,13 @@ export class AnalyticsStore {
     let guardrailInterventions = 0;
 
     for (const session of sessions) {
-      if (session.maxHintLevel === 1) hintsByLevel.l1++;
-      else if (session.maxHintLevel === 2) hintsByLevel.l2++;
-      else if (session.maxHintLevel >= 3) hintsByLevel.l3++;
+      if (!session) continue;
+      const hintLevel = typeof session.maxHintLevel === 'number' ? session.maxHintLevel : 1;
+      if (hintLevel === 1) hintsByLevel.l1++;
+      else if (hintLevel === 2) hintsByLevel.l2++;
+      else if (hintLevel >= 3) hintsByLevel.l3++;
 
-      const lang = session.language.toLowerCase() || 'unknown';
+      const lang = (session.language || 'unknown').toLowerCase();
       languages[lang] = (languages[lang] || 0) + 1;
 
       if (session.wasFallback) {
@@ -62,12 +65,12 @@ export class AnalyticsStore {
       }
 
       // Infer concept if not explicitly provided
-      const concept = session.concept || AnalyticsStore.inferConcept(session.question, session.language);
+      const concept = session.concept || AnalyticsStore.inferConcept(session.question || '', session.language || '');
       if (!conceptStats[concept]) {
         conceptStats[concept] = { total: 0, struggle: 0 };
       }
       conceptStats[concept].total++;
-      if (session.maxHintLevel >= 2 || session.wasFallback) {
+      if (hintLevel >= 2 || session.wasFallback) {
         conceptStats[concept].struggle++;
       }
     }
@@ -104,8 +107,8 @@ export class AnalyticsStore {
     };
   }
 
-  public static inferConcept(question: string, _language: string): string {
-    const q = question.toLowerCase();
+  public static inferConcept(question?: string, _language?: string): string {
+    const q = (question || '').toLowerCase();
     if (q.includes('while') || q.includes('infinite') || q.includes('loop') || q.includes('for') || q.includes('iterate')) {
       return 'Loop Termination & Iteration';
     }
