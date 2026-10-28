@@ -2,7 +2,7 @@
   "name": "socraticcode",
   "displayName": "SocraticCode",
   "description": "Think Better. Code Smarter. — AST-Informed AI Tutor for Progressive Socratic Programming Feedback",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "socraticcode",
   "engines": {
     "vscode": "^1.85.0"
