@@ -7,3 +7,4 @@ out/
 .env
 *.log
 temp/
+.agents/
